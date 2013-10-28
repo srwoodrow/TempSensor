@@ -7,6 +7,8 @@
 #define LED_Pin 13
 
 int HIH_Address = 0x27;
+unsigned int humidity, temp = 0;
+byte HIH_Status = 0;
 
 // Manually add a prototype to fetch_data function - this allows pass by reference
 boolean fetch_data(byte& HIH_Status, unsigned int& humidity, unsigned int& temp);
@@ -27,13 +29,16 @@ void setup ()
 
 void loop()
 {
-   byte HIH_Status = 0;
-   unsigned int humidity, temp = 0;
-   double rel_humidity, temp_C;
+   float rel_humidity, temp_C = 0.0;
    
    // Get data from sensor - error flag signals whether the correct # of bytes were received
-   boolean error = fetch_data(HIH_Status, humidity, temp);
-   
+   boolean error = fetch_data();
+   /*
+   Serial.print("Raw humidity data: ");
+   Serial.println(humidity);
+   Serial.print("Raw temp data: ");
+   Serial.println(temp);
+   */
    // Make sure the correct number of bytes were received from the sensor
    if(!error)
    {
@@ -41,8 +46,8 @@ void loop()
      {
        // Convert data to relative humidity / temp in C
        // According to formulae given in datasheet
-       temp_C = (double)(temp / 2703195) - 40;
-       rel_humidity = (double)(humidity / 16383) * 100;
+       temp_C = ((float)temp / 16383 * 165) - 40;
+       rel_humidity = (float)humidity / 16383 * 100;
        
        Serial.print("Relative humidity: ");
        Serial.print(rel_humidity);
@@ -83,13 +88,12 @@ void loop()
 }
 
 
-boolean fetch_data(byte& HIH_Status, unsigned int& humidity, unsigned int& temp)
+boolean fetch_data()
 {
   digitalWrite(LED_Pin, HIGH);
   
-  byte data[4];             // To store received data from the chip (4 bytes)
-  byte HIH_status;          
-  boolean error = false;
+  byte data[4];             // To store received data from the chip (4 bytes)          
+  boolean error = false;    // Error flag to check we have received the right number of bytes (4)
   
   Wire.beginTransmission(HIH_Address);
   Wire.endTransmission();
@@ -110,11 +114,12 @@ boolean fetch_data(byte& HIH_Status, unsigned int& humidity, unsigned int& temp)
       error = true;    // Flag an error
     }
   }
+  Wire.endTransmission();
 
   // Only process if there is no error
   if(!error)
   {
-    HIH_status = (data[0] >> 6) & B00000011;    // Extract status bits
+    HIH_Status = (data[0] >> 6) & B00000011;    // Extract status bits
     humidity = word( (data[0] & B00111111), data[1]);
     temp = word(data[2], data[3]);
     temp = temp >> 2;        // Drop the last 2 bits (Do Not Care)
