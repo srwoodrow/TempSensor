@@ -30,7 +30,6 @@ void loop()
     }
     else if(incomingByte == 'M' || incomingByte == 'm')    // Signal to take a measurement
     {
-      Serial.println("Measuring humidity");
       measure();
     }
   }
@@ -43,7 +42,6 @@ void measure()
 {
   // Get humidity data from HIH6130 - error byte should be zero if no errors
   byte hum_error = fetch_humidity();
-  Serial.println("Successfully fetched data");
   if(hum_error == 0)      // If there were no errors
   {
     rel_humidity = (float)humidity / 16383 * 100;    // Convert raw data to relative humidity
@@ -53,7 +51,7 @@ void measure()
   else
   {
     Serial.print("RH Error ");
-    Serial.print(hum_error);
+    Serial.println(hum_error);
   }  
 }
 
