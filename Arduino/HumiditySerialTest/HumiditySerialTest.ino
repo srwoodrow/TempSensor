@@ -2,7 +2,7 @@
 
 #include <Wire.h>       // I2C library for HIH6130 humidity sensor
 
-#define SDA A4
+#define SDAPin A4
 
 int HIH_Address = 0x27;                // Address of HIH6130
 uint16_t humidity, HIH_temp = 0;       // Current humidity & temp reading from HIH6130
@@ -15,8 +15,8 @@ void setup()
   Serial.begin(9600);              // Establish serial comms with PC
   
   Wire.begin();                    // Join I2C bus as master
-  pinMode(SDA, OUTPUT);            // Set I2C data line as an output
-  digitalWrite(SDA, HIGH);         // Turn on HIH6130
+  pinMode(SDAPin, OUTPUT);            // Set I2C data line as an output
+  digitalWrite(SDAPin, HIGH);         // Turn on HIH6130
 }
 
 void loop()
@@ -61,17 +61,14 @@ void measure()
 
 boolean fetch_humidity()
 {
-  Serial.println("Fetching data...");
   byte data[4];             // To store received data from the chip (4 bytes)          
-  boolean error = false;    // Error flag to check we have received the right number of bytes (4)
+  boolean error = false;    // Error flag to check we have received the right number of bytes (4)  
   
   Wire.beginTransmission(HIH_Address);
   Wire.endTransmission();
   delay(100);
  
   Wire.requestFrom(HIH_Address, 4);    // Request 4 bytes from the sensor
-  
-  Serial.println("Requesting data from chip");
   
   // We expect 4 bytes from the chip
   for(int i = 0; i < 4; i++)
@@ -88,8 +85,6 @@ boolean fetch_humidity()
   }
   Wire.endTransmission();
 
-  Serial.println("Got data, processing...");
-  
   // Only process if there is no error
   if(!error)
   {

@@ -179,7 +179,7 @@ void loop()
 
 boolean fetch_humidity()
 {
-  byte da[4];             // To store received data from the chip (4 bytes)          
+  byte data[4];             // To store received data from the chip (4 bytes)          
   boolean error = false;    // Error flag to check we have received the right number of bytes (4)
   
   Wire.beginTransmission(HIH_Address);
