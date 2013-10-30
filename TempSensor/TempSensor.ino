@@ -10,6 +10,7 @@
 #define SCK 13          // (SPI) Serial clock
 #define MISO 12         // (SPI) Master In Slave Out - send data to Master (Arduino)
 #define MOSI 11         // (SPI) Master Out Slave In - send data to Slave (temp sensor)
+#define SS 10           // (SPI) Slave select
 
 // Sensor SPI command bytes
 #define READ_TEMP_REG            0x50  // Read from temperature register
@@ -18,9 +19,13 @@
 #define SIXTEEN_BIT_MODE         0x80  // Enable 16bit resolution (13bit is default)
 #define ENABLE_ONE_SHOT_MODE     0x20  // Enable single-shot conversion mode (default is continuous conversion)
 
-#define SPIbusSize 1                   // Number of sensors on SPI bus
-byte CSPins [SPIbusSize] = {10};       // CS pin used for each sensor
-float temperature[SPIbusSize];         // Current temperature of each device
+// Protocol for data  within the dataOut byte array
+#define hum_L      0              
+#define hum_H      1
+#define temp_L     2
+#define temp_H     3
+
+float temperature;                     // Current temperature of the device
 
 unsigned int conversionDelay = 250;    // Time taken to perform a temperature conversion (mS) specified min is 240mS
 unsigned long lastConversionRequest;   // Keep track of time since we last performed a conversion
@@ -28,6 +33,8 @@ unsigned long lastConversionRequest;   // Keep track of time since we last perfo
 int HIH_Address = 0x27;                // Address of the HIH6130
 unsigned int humidity = 0;             // Current humidity reading
 byte HIH_Status = 0;                   // Status byte from the HIH6130
+
+byte dataOut[4] = {0};                 // Array of bytes to send data via serial to the PC
 
 void setup ()
 {
@@ -75,7 +82,11 @@ void measure(){
 // Sends the temperature & humidity data to the PC
 void sendData()
 {
- 
+  
+  if(hum_error == 0)
+  {
+   
+  }
   
 }
 
