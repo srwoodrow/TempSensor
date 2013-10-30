@@ -1,12 +1,12 @@
-// Sketch to communicate between Arduino Uno & Honeywell HIH6130 temperature/humidity sensor chip
-// Written by S.Woodrow, last updated 30/10/2013
+// Firmware for Arduino Uno, to interface with Honeywell HIH6130 humidity/temperature sensor and ADT7310 temperature sensor
+
 
 // Communication libraries
 #include <Wire.h>       // I2C library for HIH6130 humidity sensor
 #include <SPI.h>        // SPI library for ADT7310 temperature sensor
 
 // Pins used on Arduino Uno
-#define SDA A4          // (I2C) Serial data line (send/receive data for humidity sensor)
+#define SDAPin A4
 #define SCK 13          // (SPI) Serial clock
 #define MISO 12         // (SPI) Master In Slave Out - send data to Master (Arduino)
 #define MOSI 11         // (SPI) Master Out Slave In - send data to Slave (temp sensor)
@@ -19,30 +19,23 @@
 #define SIXTEEN_BIT_MODE         0x80  // Enable 16bit resolution (13bit is default)
 #define ENABLE_ONE_SHOT_MODE     0x20  // Enable single-shot conversion mode (default is continuous conversion)
 
-// Protocol for data  within the dataOut byte array
-#define hum_L      0              
-#define hum_H      1
-#define temp_L     2
-#define temp_H     3
 
-float temperature;                     // Current temperature of the device
-
+float temperature;                     // Current temperature of the ADT7310
 unsigned int conversionDelay = 250;    // Time taken to perform a temperature conversion (mS) specified min is 240mS
-unsigned long lastConversionRequest;   // Keep track of time since we last performed a conversion
 
-int HIH_Address = 0x27;                // Address of the HIH6130
-unsigned int humidity = 0;             // Current humidity reading
+int HIH_Address = 0x27;                // Address of HIH6130
+uint16_t humidity, HIH_temp = 0;       // Current humidity & temp reading from HIH6130
 byte HIH_Status = 0;                   // Status byte from the HIH6130
+float rel_humidity = 0.0;              // Float to store relative humidity
 
-byte dataOut[4] = {0};                 // Array of bytes to send data via serial to the PC
 
-void setup ()
+void setup()
 {
-  Serial.begin(9600);              // Establish serial comms with PC (via USB)
+  Serial.begin(9600);              // Establish serial comms with PC
   
   Wire.begin();                    // Join I2C bus as master
-  pinMode(SDA, OUTPUT);            // Set I2C data line as an output
-  digitalWrite(SDA, HIGH);         // Turn on the HIH6130
+  pinMode(SDAPin, OUTPUT);            // Set I2C data line as an output
+  digitalWrite(SDAPin, HIGH);         // Turn on HIH6130
   
   SPI.begin();                            // This sets SCK, MOSI, and SS to outputs and pulls MOSI low and SCK & CS high. 
   SPI.setDataMode(SPI_MODE3);             // (CPOL=1, CPHA=1)
@@ -50,137 +43,60 @@ void setup ()
   SPI.setClockDivider(SPI_CLOCK_DIV8);    // The sensor needs a min clock period of 200ns (5MHz). Arduino Uno runs at 16MHz, so this gives 2MHz
   pinMode(MISO, INPUT);  
   
-  // Make sure that no chips on the SPI bus are activated accidentally
-  for (int i = 0; i < SPIbusSize; i++)
-  {
-    pinMode(CSPins[i], OUTPUT);           // Set CS pin as output
-    digitalWrite(CSPins[i],HIGH);         // Set CS pin high (device disabled)
-  }
-  
-  resetBus();               // Put bus into a known state (digital pins strobing on startup can confuse the sensors)
-    
-    
-  attachInterrupt(0, measure, RISING);    // Enable Interrupt 0 (pin 2) on rising edge to take a measurement
-}
-
-
-void measure(){
- 
-  // Get humidity data from HIH6130 - error flag signals whether the correct # of bytes were received
-  byte hum_error = fetch_humidity();
-  fetch_temp();      // Get temperature from ADT7310 - no error flags
-  
-  if(hum_error == 0)
-    rel_humidity = (float)humidity / 16383 * 100;    // Convert raw data to relative humidity
-    
-  
-  
-
-  
-}
-
-// Sends the temperature & humidity data to the PC
-void sendData()
-{
-  
-  if(hum_error == 0)
-  {
-   
-  }
-  
-}
-
-// Performs a measurement of temperature on each sensor, stores the result in global variable temperature[]
-void fetch_temp()
-{
-  // Request conversion for each temp sensor on the SPI bus 
-  for(byte i = 0; i < SPIbusSize; i++)
-  {
-    digitalWrite(CSPins[i], LOW);
-    SPI.transfer(WRITE_TO_CONFIG_REG);
-    SPI.transfer(ENABLE_ONE_SHOT_MODE | SIXTEEN_BIT_MODE);
-    digitalWrite(CSPins[i], HIGH);
-  }
-  
-  delay(conversionDelay);      // Delay to allow sensors to perform conversion
-  
-  // Read temperatures of each sensor on the SPI bus
-  for(byte i = 0; i < SPIbusSize; i++)
-  {
-    digitalWrite(CSPins[i], LOW);
-    SPI.transfer(READ_TEMP_REG);
-    byte tempData [2];
-    tempData [1] = SPI.transfer(0x00);
-    tempData [0] = SPI.transfer(0x00);
-    digitalWrite(CSPins[i], HIGH);
-
-    uint16_t  tempInt = *((uint16_t*)(tempData));
-    if( 0x80 & tempData[1] )      // MSB is sign bit
-     temperature[i] = ((float)(tempInt - 65536))/128;  // Negative temperature
-    else
-      temperature[i] = ((float)tempInt)/128;      // Positive temperature
-  }
+  // Make sure that the ADT7310 chip is disabled
+  pinMode(SS, OUTPUT);                   // Set SS pin as output
+  digitalWrite(SS, HIGH);                // Set SS pin high (device disabled)
+  resetSPI();                            // Put bus into a known state (digital pins strobing on startup can confuse the sensors)
   
 }
 
 void loop()
 {
-   float rel_humidity = 0.0;
-   
-   // Get data from sensor - error flag signals whether the correct # of bytes were received
-   boolean error = fetch_data();
-
-   // Make sure the correct number of bytes were received from the sensor
-   if(!error)
-   {
-     if(HIH_Status == 0)
-     {
-       // Convert data to relative humidity / temp in C
-       // According to formulae given in datasheet
-       temp_C = ((float)temp / 16383 * 165) - 40;
-       rel_humidity = (float)humidity / 16383 * 100;
-       
-       Serial.print("Relative humidity: ");
-       Serial.print(rel_humidity);
-       Serial.println("%");
-       
-       Serial.print("Temperature: ");
-       Serial.print(temp_C);
-       Serial.println(" C");
-     }
-     else if (HIH_Status == 1)
-     {
-       Serial.println("Stale data"); 
-     }
-     else if (HIH_Status == 2)
-     {
-       Serial.println("Device in command mode"); 
-     }
-     else if (HIH_Status == 3)
-     {
-       Serial.println("Diagnostic condition"); 
-     }
-     else
-     {
-       Serial.println("Unknown error");
-       Serial.print("Status byte: ");
-       Serial.println(HIH_Status);
-     }
-   }
-   else
-   {
-     Serial.println("Error: Too few bytes received from sensor");
-   }
-
-  delay(1000);                    // Delay to take data every 1s
+  while(Serial.available() > 0)    // Wait until bytes are available on the serial port
+  {
+    char incomingByte = Serial.read();                     // Read the byte
+    if(incomingByte == 'T'|| incomingByte == 't')          // Test case
+    {
+      Serial.println("Test command received");  
+    }
+    else if(incomingByte == 'M' || incomingByte == 'm')    // Signal to take a measurement
+    {
+      measure();
+    }
+  }
+  
   
 }
 
 
-boolean fetch_humidity()
+void measure()
+{
+  // Get humidity data from HIH6130 - error byte should be zero if no errors
+  byte hum_error = fetch_humidity();
+  if(hum_error == 0)      // If there were no errors
+  {
+    rel_humidity = (float)humidity / 16383 * 100;    // Convert raw data to relative humidity
+    Serial.print("RH = ");
+    Serial.println(rel_humidity);    
+  }  
+  else
+  {
+    Serial.print("RH Error ");
+    Serial.println(hum_error);
+  }  
+  
+  fetch_temp();
+  Serial.print("T = ");
+  Serial.println(temperature);
+  
+}
+
+
+
+byte fetch_humidity()
 {
   byte data[4];             // To store received data from the chip (4 bytes)          
-  boolean error = false;    // Error flag to check we have received the right number of bytes (4)
+  boolean error = false;    // Error flag to check we have received the right number of bytes (4)  
   
   Wire.beginTransmission(HIH_Address);
   Wire.endTransmission();
@@ -210,7 +126,48 @@ boolean fetch_humidity()
     humidity = word( (data[0] & B00111111), data[1]);
     HIH_temp = word(data[2], data[3]);
     HIH_temp = HIH_temp >> 2;        // Drop the last 2 bits (Do Not Care)
+    
+    return HIH_Status;
   }
-  
-  return error;
+  else 
+    return 4;
 }
+
+
+void fetch_temp()
+{
+  // Request conversion for temp sensor 
+  digitalWrite(SS, LOW);                // Enable device
+  SPI.transfer(WRITE_TO_CONFIG_REG);
+  SPI.transfer(ENABLE_ONE_SHOT_MODE | SIXTEEN_BIT_MODE);
+  digitalWrite(SS, HIGH);               // Disable device
+  
+  delay(conversionDelay);               // Delay to allow sensor to perform conversion
+  
+  // Read temperatures of sensor
+  digitalWrite(SS, LOW);                // Enable device
+  SPI.transfer(READ_TEMP_REG);
+  byte tempData [2];
+  tempData [1] = SPI.transfer(0x00);
+  tempData [0] = SPI.transfer(0x00);
+  digitalWrite(SS, HIGH);               // Disable device
+
+  uint16_t  tempInt = *((uint16_t*)(tempData));
+  if( 0x80 & tempData[1] )                           // MSB is sign bit
+   temperature = ((float)(tempInt - 65536))/128;     // Negative temperature
+  else
+    temperature = ((float)tempInt)/128;              // Positive temperature
+}
+
+
+void resetSPI()      // Reset the ADT7310 on the bus by writing a series of 32 1s
+{
+  digitalWrite(SS, LOW);	// Enable device
+  SPI.transfer(0xFF);
+  SPI.transfer(0xFF);
+  SPI.transfer(0xFF);
+  SPI.transfer(0xFF);  
+  digitalWrite(SS, HIGH);       // Disable device
+  delay(1);  // Make sure sensor has plenty of time to reset  
+}
+
