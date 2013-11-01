@@ -3,30 +3,22 @@ import serial
 import time
 import threading
 
-interval = 1.0							# Measurement interval
-folder = "H:\\"
-filename = "T_H_Log_"
+##############################################
+# Global variables
+##############################################
+interval = 600.0									# Measurement interval (in seconds)
+folder = "H:\\TempSensorTest\\"					# Folder to store log files
+filename = "T_H_Log_"							# Log file name
 
+exit = False									# Flag to tell the program when to exit
+##############################################
+# Function declarations
+##############################################
 
-mySerial = serial.Serial('COM6')				# Open serial port
-# Print message for user
-s = "Serial port " + mySerial.name + " opened"
-print s
-#
-
-# When serial port is opened, Arduino resets. Delay to ensure commands are received properly.
-time.sleep(2)	
-
-today = time.strftime("%Y-%m-%d")
-myFilename = folder + filename + today + ".txt"
-lastMeasurement = time.time()
-
-myFile = open(myFilename, "w")
-myFile.write("Time\tRH\tT\n")
-myFile.close()
-
-exit = False
-
+# Function to measure temp & humidity, and write to log file
+# Serial comms with Arduino (running TempSensor.ino). Sends instructions & receives data as a string.
+# Creates a new file for each day, and writes time,temp,RH to file
+# This is called by 'repeat' every time a measurement is required
 def measure():
 	global today, myFilename, lastMeasurement
 	
@@ -57,7 +49,7 @@ def measure():
 		s = time.strftime("%H:%M:%S")
 		s += "\t" + temp + "\t" + RH + "\n"
 		
-		print(s)								# Print for debugging
+#		print(s)								# Print for debugging
 		
 		# Write string to file
 		myFile = open(myFilename, "a")
@@ -66,47 +58,68 @@ def measure():
 		
 		lastMeasurement = time.time()			# Store time of measurement
 
-	
+# Wrapper function to call myFunction every myInterval seconds, until exit flag is set	
 def repeat(myInterval, myFunction ):
 	global exit
 	if exit == False:							# Check that exit flag is not set
 		global myTimer
+		# Restart timer to call this same function again in myInterval seconds
 		myTimer = threading.Timer( myInterval, repeat, [myInterval, myFunction] )
 		myTimer.start()
-		myFunction()
+		myFunction()							# Call required function
 	else:
 		print "Stopping timer"
 		
-
+# Function to change the measurement interval based on user input
+# This is called by 'get_instruction' when the user chooses to change measurement interval
 def setInterval():
 	global myTimer
-	myTimer.cancel()
+	myTimer.cancel()							# Stop existing timer
 	
 	newInterval = raw_input('Choose new interval (s):')		# Get user input
-	interval = float(newInterval)		# Set new interval in global variable
+	interval = float(newInterval)				# Set new interval in global variable
+	
+	# Print confirmation of new interval for user
 	s = "Measurement interval " + repr(interval) + "s"
 	print s
 	
+	repeat(interval, measure )					# Start timer repeating
 
-	# myTimer = threading.Timer( interval, repeat, [interval, measure] )		# Reset timer with new interval
-	# myTimer.start()						# Restart timer
-
-	repeat(interval, measure )			# Start timer repeating
-
-	
-repeat(interval, measure)	
-	
+# Function to prompt user for instructions, read user input and interpret
 def get_instruction():
+	# Get user input
 	instruction = raw_input('Type instructions (Q to quit, I to set new measurement interval):\n')
 	if instruction == "q" or instruction == "Q":
 		print("Quit command received")
 		global exit
-		exit = True
+		exit = True								# Set exit flag - this will be detected next time 'repeat' is run
 	elif instruction == "i" or instruction == "I":
-		setInterval()
+		setInterval()							# Call function to set a new measurement interval
+		
+##############################################
 
 
-while exit == False:
+mySerial = serial.Serial('COM6')				# Open serial port
+# Print message for user
+s = "Serial port " + mySerial.name + " opened"
+print s
+
+# When serial port is opened, Arduino resets. Delay to ensure commands are received properly.
+time.sleep(2)	
+
+today = time.strftime("%Y-%m-%d")				# Store today's date - need to compare to see when we need to create a new file
+myFilename = folder + filename + today + ".txt" # Create string for filename
+lastMeasurement = time.time()					# Store timestamp of last measurement
+
+# Write header row to file initially
+myFile = open(myFilename, "w")
+myFile.write("Time\tRH\tT\n")
+myFile.close()
+
+repeat(interval, measure)						# Call 'repeat' to execute 'measure' every 'interval' seconds
+
+while exit == False:							# Repeat this until exit flag is set
+	# Create new thread for receiving input, so that measurements can still be made concurrently
 	inputThread = threading.Thread(target=get_instruction)
 	inputThread.start()
-	inputThread.join()
+	inputThread.join()							# Wait for thread to end (input to be received)
