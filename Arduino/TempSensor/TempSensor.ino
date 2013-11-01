@@ -74,6 +74,11 @@ void loop()
 
 void measure()
 {
+  // Get temperature data from the ADT7310
+  fetch_temp();
+  Serial.print("T = ");
+  Serial.println(temperature);
+  
   // Get humidity data from HIH6130 - error byte should be zero if no errors
   byte hum_error = fetch_humidity();
   if(hum_error == 0)      // If there were no errors
@@ -87,11 +92,6 @@ void measure()
     Serial.print("RH Error ");
     Serial.println(hum_error);
   }  
-  
-  fetch_temp();
-  Serial.print("T = ");
-  Serial.println(temperature);
-  
 }
 
 
