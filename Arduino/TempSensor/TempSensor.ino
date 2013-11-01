@@ -7,6 +7,7 @@
 
 // Pins used on Arduino Uno
 #define SDAPin A4
+
 #define SCK 13          // (SPI) Serial clock
 #define MISO 12         // (SPI) Master In Slave Out - send data to Master (Arduino)
 #define MOSI 11         // (SPI) Master Out Slave In - send data to Slave (temp sensor)
@@ -22,6 +23,7 @@
 
 float temperature;                     // Current temperature of the ADT7310
 unsigned int conversionDelay = 250;    // Time taken to perform a temperature conversion (mS) specified min is 240mS
+
 
 int HIH_Address = 0x27;                // Address of HIH6130
 uint16_t humidity, HIH_temp = 0;       // Current humidity & temp reading from HIH6130
@@ -62,6 +64,7 @@ void loop()
     else if(incomingByte == 'M' || incomingByte == 'm')    // Signal to take a measurement
     {
       measure();
+      delay(100);
     }
   }
   
