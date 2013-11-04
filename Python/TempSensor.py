@@ -6,9 +6,9 @@ import threading
 ##############################################
 # Global variables
 ##############################################
-interval = 10.0								# Measurement interval (in seconds)
+interval = 5.0									# Measurement interval (in seconds)
 folder = "H:\\TempSensorTest\\"					# Folder to store log files
-filename = "T_H_Log_"							# Log file name
+logName = "T_H_Log_"							# Log file name
 
 exit = False									# Flag to tell the program when to exit
 ##############################################
@@ -20,41 +20,56 @@ exit = False									# Flag to tell the program when to exit
 # Creates a new file for each day, and writes time,temp,RH to file
 # This is called by 'repeat' every time a measurement is required
 def measure():
-	global today, myFilename, lastMeasurement
+	global today, myFilenames, lastMeasurement, mySerialPorts
 	
-	# Only allow a measurement every 0.5s to stop errors
+	myTemps = []
+	myRHs = []
+	
+	# Only allow a measurement every 0.5s to stop errors from sensor chips
 	if (time.time() - lastMeasurement) > 0.49:
 		s = time.strftime("%Y-%m-%d")
 		if today != s:							# If the day has changed
 			today = s							# Update the day
-			# Update filename
-			myFilename = folder + filename + today + ".txt"
-			# Write header row in new file
-			myFile = open(myFilename, 'w')
-			myFile.write("Time\tT\tRH\n")
+			
+			# Update filenames
+			myFiles = []
+			for i in range(len(mySerialPorts)):
+				filename = folder + logName + mySerialPorts[i].name + "_" + today + ".txt"
+				myFiles.append(filename, 'w')
+			# Write header row in new files
+			for file in myFiles:
+				file.write("Time\tT\tRH\n")
+				file.close()
+		
+		print(len(mySerialPorts))
+		for ser in mySerialPorts:
+			print("Sending command to" + ser.name)
+			ser.write("M")							# Send signal to take a measurement
+			myTemps.append(ser.readline())			# First line output from Arduino is the temperature
+			myRHs.append(ser.readline())			# Second line is the relative humidity
+			print("Readings received")
+		
+		print(len(myTemps))
+		
+		for i in range(len(myTemps)):
+			myTemps[i] = myTemps[i][4:9]				# Extract temp reading only
+			
+			if myRHs[i][3:7] == "Error":				# Make sure there was no error
+				myRHs[i] = "Error" + myRHs[i][8:]		# If so, extract error code
+			else:
+				myRHs[i] = myRHs[i][5:10]				# If not, extract RH reading only
+			
+			# Create string of tab separated timestamp, temp, RH
+			s = time.strftime("%H:%M:%S")
+			s += "\t" + myTemps[i] + "\t" + myRHs[i] + "\n"
+			
+			print(myFilenames[i])
+			print(s)									# Print filename & string for debugging
+			
+			# Write string to file
+			myFile = open(myFilenames[i], 'a')
+			myFile.write(s)
 			myFile.close()
-		
-		mySerial.write("M")						# Send signal to take a measurement
-		temp = mySerial.readline()				# First line output from Arduino is the temperature
-		RH = mySerial.readline()				# Second line is the relative humidity
-		
-		temp = temp[4:9]						# Extract temp reading only
-		
-		if RH[3:7] == "Error":					# Make sure there was no error
-			RH = "Error" + RH[8:]				# If so, extract error code
-		else:
-			RH = RH[5:10]						# If not, extract RH reading only
-		
-		# Create string of tab separated timestamp, temp, RH
-		s = time.strftime("%H:%M:%S")
-		s += "\t" + temp + "\t" + RH + "\n"
-		
-#		print(s)								# Print for debugging
-		
-		# Write string to file
-		myFile = open(myFilename, 'a')
-		myFile.write(s)
-		myFile.close()
 		
 		lastMeasurement = time.time()			# Store time of measurement
 
@@ -76,7 +91,7 @@ def setInterval():
 	global myTimer
 	myTimer.cancel()							# Stop existing timer
 	
-	newInterval = raw_input('Choose new interval (s):')		# Get user input
+	newInterval = raw_input('Choose new interval (s): ')		# Get user input
 	interval = float(newInterval)				# Set new interval in global variable
 	
 	# Print confirmation of new interval for user
@@ -99,26 +114,40 @@ def get_instruction():
 ##############################################
 
 
-mySerial = serial.Serial('COM6')				# Open serial port
-# Print message for user
-s = "Serial port " + mySerial.name + " opened"
-print s
+mySerialPorts = []								# Create list of serial ports
+
+# Scan available ports and test to see if they are running the right firmware, automatically add to list.. ?
+mySerialPorts.append(serial.Serial('COM5'))		# Open serial ports
+mySerialPorts.append(serial.Serial('COM6'))
+
+
+# For each serial port, print message for user
+for ser in mySerialPorts:
+	s = "Serial port " + ser.name + " opened"
+	print s
 
 # When serial port is opened, Arduino resets. Delay to ensure commands are received properly.
 time.sleep(2)	
 
 today = time.strftime("%Y-%m-%d")				# Store today's date - need to compare to see when we need to create a new file
-myFilename = folder + filename + today + ".txt" # Create string for filename
 lastMeasurement = time.time()					# Store timestamp of last measurement
 
-# Print measurement interval for user
-s = "Measurement interval " + repr(interval) + "s"
-print(s)
+myFilenames = []								# Create list of filenames
+for ser in mySerialPorts:						# Create string for each filename
+	myFilenames.append(folder + logName + ser.name + "_" + today + ".txt") #
 
-# Write header row to file initially
-myFile = open(myFilename, 'w')
-myFile.write("Time\tT\tRH\n")
-myFile.close()
+# Print measurement interval for user
+myString = "Measurement interval " + repr(interval) + "s"
+print(myString)
+
+myFiles = []									# Create list of files								
+
+for filename in myFilenames:					# Populate list of files based on filenames
+	myFiles.append(open(filename, 'w'))
+
+for file in myFiles:							# Write header row to file initially
+	file.write("Time\tT\tRH\n")
+	file.close()
 
 repeat(interval, measure)						# Call 'repeat' to execute 'measure' every 'interval' seconds
 
