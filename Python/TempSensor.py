@@ -6,7 +6,7 @@ import threading
 ##############################################
 # Global variables
 ##############################################
-interval = 300.0								# Measurement interval (in seconds)
+interval = 10.0								# Measurement interval (in seconds)
 folder = "H:\\TempSensorTest\\"					# Folder to store log files
 filename = "T_H_Log_"							# Log file name
 
