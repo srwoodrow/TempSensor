@@ -6,7 +6,7 @@ import threading
 ##############################################
 # Global variables
 ##############################################
-interval = 600.0									# Measurement interval (in seconds)
+interval = 300.0								# Measurement interval (in seconds)
 folder = "H:\\TempSensorTest\\"					# Folder to store log files
 filename = "T_H_Log_"							# Log file name
 
@@ -30,8 +30,8 @@ def measure():
 			# Update filename
 			myFilename = folder + filename + today + ".txt"
 			# Write header row in new file
-			myFile = open(myFilename, "w")
-			myFile.write("Time\tRH\tT")
+			myFile = open(myFilename, 'w')
+			myFile.write("Time\tT\tRH\n")
 			myFile.close()
 		
 		mySerial.write("M")						# Send signal to take a measurement
@@ -52,7 +52,7 @@ def measure():
 #		print(s)								# Print for debugging
 		
 		# Write string to file
-		myFile = open(myFilename, "a")
+		myFile = open(myFilename, 'a')
 		myFile.write(s)
 		myFile.close()
 		
@@ -111,9 +111,13 @@ today = time.strftime("%Y-%m-%d")				# Store today's date - need to compare to s
 myFilename = folder + filename + today + ".txt" # Create string for filename
 lastMeasurement = time.time()					# Store timestamp of last measurement
 
+# Print measurement interval for user
+s = "Measurement interval " + repr(interval) + "s"
+print(s)
+
 # Write header row to file initially
-myFile = open(myFilename, "w")
-myFile.write("Time\tRH\tT\n")
+myFile = open(myFilename, 'w')
+myFile.write("Time\tT\tRH\n")
 myFile.close()
 
 repeat(interval, measure)						# Call 'repeat' to execute 'measure' every 'interval' seconds
