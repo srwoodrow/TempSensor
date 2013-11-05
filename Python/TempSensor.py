@@ -2,6 +2,7 @@
 import serial
 import time
 import threading
+import os
 
 ##############################################
 # Global variables
@@ -32,25 +33,21 @@ def measure():
 			today = s							# Update the day
 			
 			# Update filenames
-			myFiles = []
-			for i in range(len(mySerialPorts)):
+			myFiles = []							# Create empty list of files
+			for i in range(len(mySerialPorts)):		# For each sensor connected to the PC via serial
 				filename = folder + logName + mySerialPorts[i].name + "_" + today + ".txt"
-				myFiles.append(filename, 'w')
+				if not os.path.isfile(filename):	# Only create a new file if one does not already exist
+					myFiles.append(filename, 'w')	# Add file to list based on filename
 			# Write header row in new files
 			for file in myFiles:
 				file.write("Time\tT\tRH\n")
 				file.close()
-		
-		print(len(mySerialPorts))
+
 		for ser in mySerialPorts:
-			print("Sending command to" + ser.name)
 			ser.write("M")							# Send signal to take a measurement
 			myTemps.append(ser.readline())			# First line output from Arduino is the temperature
 			myRHs.append(ser.readline())			# Second line is the relative humidity
-			print("Readings received")
-		
-		print(len(myTemps))
-		
+	
 		for i in range(len(myTemps)):
 			myTemps[i] = myTemps[i][4:9]				# Extract temp reading only
 			
@@ -62,9 +59,6 @@ def measure():
 			# Create string of tab separated timestamp, temp, RH
 			s = time.strftime("%H:%M:%S")
 			s += "\t" + myTemps[i] + "\t" + myRHs[i] + "\n"
-			
-			print(myFilenames[i])
-			print(s)									# Print filename & string for debugging
 			
 			# Write string to file
 			myFile = open(myFilenames[i], 'a')
@@ -140,11 +134,12 @@ for ser in mySerialPorts:						# Create string for each filename
 s = "Measurement interval " + repr(interval) + "s"
 print(s)
 
+# Create & write header to log files - only if the file does not exist!
+# This means that if the program is stopped halfway through the day, it will not overwrite existing logs
 myFiles = []									# Create list of files								
-
 for filename in myFilenames:					# Populate list of files based on filenames
-	myFiles.append(open(filename, 'w'))
-
+	if not os.path.isfile(filename):			# Only add file to the list if it does not already exist
+		myFiles.append(open(filename, 'w'))
 for file in myFiles:							# Write header row to file initially
 	file.write("Time\tT\tRH\n")
 	file.close()
