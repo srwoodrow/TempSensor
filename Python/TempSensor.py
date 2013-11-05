@@ -6,7 +6,7 @@ import threading
 ##############################################
 # Global variables
 ##############################################
-interval = 5.0									# Measurement interval (in seconds)
+interval = 2.0									# Measurement interval (in seconds)
 folder = "H:\\TempSensorTest\\"					# Folder to store log files
 logName = "T_H_Log_"							# Log file name
 
@@ -137,8 +137,8 @@ for ser in mySerialPorts:						# Create string for each filename
 	myFilenames.append(folder + logName + ser.name + "_" + today + ".txt") #
 
 # Print measurement interval for user
-myString = "Measurement interval " + repr(interval) + "s"
-print(myString)
+s = "Measurement interval " + repr(interval) + "s"
+print(s)
 
 myFiles = []									# Create list of files								
 
